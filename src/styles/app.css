@@ -1,0 +1,131 @@
+@import "tailwindcss";
+
+:root {
+  --paper: #f6f4ef;
+  --panel: #ece8e0;
+  --ink: #1c1915;
+  --muted: #6b655c;
+  --rule: #ddd6cb;
+  --stamp: #c45c4a;
+  --verified: #2f6f5e;
+  --pending: #b0863a;
+  --danger: #c45c4a;
+  --radius: 1rem;
+  --font-geist-sans: "Geist", ui-sans-serif, system-ui, sans-serif;
+  --font-geist-mono: "Geist Mono", ui-monospace, monospace;
+  --font-newsreader: "Newsreader", ui-serif, Georgia, serif;
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-panel: var(--panel);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-rule: var(--rule);
+  --color-stamp: var(--stamp);
+  --color-verified: var(--verified);
+  --color-pending: var(--pending);
+  --color-danger: var(--danger);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-display: var(--font-newsreader);
+  --radius-xl: var(--radius);
+}
+
+html,
+body {
+  background: var(--paper);
+  color: var(--ink);
+  min-height: 100%;
+}
+
+body {
+  font-family: var(--font-geist-sans);
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+#app {
+  min-height: 100%;
+}
+
+.font-display {
+  font-family: var(--font-newsreader);
+}
+
+.font-mono {
+  font-variant-numeric: tabular-nums;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--verified) 22%, var(--paper));
+  color: var(--ink);
+}
+
+@keyframes stamp-settle {
+  from {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.stamp-animate {
+  animation: stamp-settle 200ms ease-out;
+}
+
+.svenjs-credit {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--panel) 40%, var(--paper));
+  border: 1px solid color-mix(in srgb, var(--rule) 80%, transparent);
+  padding: 6px 14px 6px 6px;
+}
+
+.svenjs-credit:hover {
+  border-color: color-mix(in srgb, var(--ink) 40%, var(--rule));
+}
+
+.svenjs-mark {
+  display: block;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+}
+
+.svenjs-credit-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  line-height: 1.15;
+}
+
+.svenjs-credit-kicker {
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.svenjs-credit-name {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

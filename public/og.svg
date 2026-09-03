@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#F6F4EF"/>
+  <text x="72" y="110" fill="#6B655C" font-family="Georgia, serif" font-size="22">ForeverFile</text>
+  <text x="72" y="340" fill="#1C1915" font-family="Georgia, serif" font-size="64">
+    <tspan x="72" dy="0">A permanent place for</tspan>
+    <tspan x="72" dy="76">important files.</tspan>
+  </text>
+  <text x="72" y="470" fill="#6B655C" font-family="Georgia, serif" font-size="28">Publish a file. Keep it public, unchanged, and checkable.</text>
+  <text x="72" y="560" fill="#2F6F5E" font-family="Georgia, serif" font-size="22">Public · Unchanged · Persistent</text>
+</svg>

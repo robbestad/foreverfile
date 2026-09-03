@@ -1,7 +1,7 @@
 {
   "name": "foreverfile",
   "version": "0.1.0",
-  "description": "Store a file forever on Arweave. Unlock with your JWK — the key never leaves the browser.",
+  "description": "A permanent place for important files. Publish a public record that cannot silently change.",
   "license": "MIT",
   "author": "Sven Anders Robbestad",
   "repository": {
@@ -16,35 +16,32 @@
     "arweave",
     "permaweb",
     "permanent-storage",
-    "nextjs"
+    "svenjs"
   ],
   "engines": {
     "node": ">=20.9.0"
   },
+  "type": "module",
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint",
+    "dev": "vite",
+    "build": "npm run build:client && npm run build:server && node ./scripts/prerender.mjs",
+    "build:client": "vite build",
+    "build:server": "vite build --ssr src/entry-server.tsx --outDir .vite/prerender --emptyOutDir",
+    "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@tanstack/react-query": "^5.102.8",
     "arweave": "^1.15.7",
-    "next": "16.3.4",
-    "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "svenjs": "3.2.1"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4",
+    "@tailwindcss/vite": "^4",
     "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "eslint": "^9",
-    "eslint-config-next": "16.3.4",
     "tailwindcss": "^4",
     "typescript": "^5",
+    "vite": "^6.2.4",
     "vitest": "^4.1.11"
   }
 }
