@@ -64,6 +64,8 @@ If I paste a path, filename, or error, diagnose it against those facts. Do not o
 
 ## Use it
 
+Need an Arweave wallet? Generate an Arweave JWK with [arweave-keygen](https://github.com/robbestad/arweave-keygen), then keep the downloaded key file private and backed up securely. To fund it, get native AR from an exchange listed in [CoinGecko's Arweave markets](https://www.coingecko.com/en/coins/arweave#markets); availability and supported withdrawal networks vary by country and exchange.
+
 1. Open [foreverfile.xyz/publish](https://foreverfile.xyz/publish) and choose a file. The fingerprint is hashed in your browser.
 2. Confirm it will be public and unchangeable. Authorize with an Arweave key that has enough AR for the one-time network fee.
 3. Keep the record URL. Anyone can open it; anyone can verify a local copy against it.
