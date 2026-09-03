@@ -1,4 +1,5 @@
 import { ButtonLink } from "@/components/button";
+import { ForeverFileMark } from "@/components/foreverfile-mark";
 import { COPY } from "@/lib/copy";
 import { create } from "svenjs";
 
@@ -23,7 +24,11 @@ export const SiteHeader = create({
       <header className="sticky top-0 z-20 border-b border-rule/80 bg-paper/80 backdrop-blur-md">
         <div className="mx-auto w-full max-w-[880px] px-5 py-3.5 sm:px-6">
           <div className="flex items-center justify-between gap-4">
-            <a href="/" className="font-display text-xl leading-none text-ink">
+            <a
+              href="/"
+              className="inline-flex items-center gap-2.5 font-display text-xl leading-none text-ink"
+            >
+              <ForeverFileMark size={32} />
               {COPY.name}
             </a>
             <div className="flex items-center gap-5">

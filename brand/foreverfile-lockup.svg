@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="ForeverFile">
+  <title>ForeverFile</title>
+  <rect width="512" height="512" fill="#E8DDBF"/>
+  <g transform="translate(148 78) scale(2.16)">
+    <circle cx="50" cy="50" r="46.4" stroke="#7C1E1C" stroke-width="4.8" fill="none"/>
+    <circle cx="50" cy="50" r="40" stroke="#7C1E1C" stroke-width="2.7" fill="none"/>
+    <path
+      d="M35.4 31 H58.2 L65.6 38.5 V69.2 H35.4 Z"
+      stroke="#7C1E1C"
+      stroke-width="3.5"
+      stroke-linejoin="round"
+      fill="none"
+    />
+    <path
+      d="M58.2 31 V38.5 H65.6"
+      stroke="#7C1E1C"
+      stroke-width="3.5"
+      stroke-linejoin="round"
+      fill="none"
+    />
+    <line x1="40.4" y1="43.4" x2="60.8" y2="43.4" stroke="#7C1E1C" stroke-width="2.2"/>
+    <line x1="40.4" y1="48.7" x2="60.8" y2="48.7" stroke="#7C1E1C" stroke-width="2.2"/>
+    <line x1="40.4" y1="54" x2="60.8" y2="54" stroke="#7C1E1C" stroke-width="2.2"/>
+    <line x1="40.4" y1="59.3" x2="51.6" y2="59.3" stroke="#7C1E1C" stroke-width="2.2"/>
+    <rect x="54.4" y="62.6" width="7.2" height="3.7" rx="0.35" fill="#7C1E1C"/>
+  </g>
+  <text
+    x="256"
+    y="412"
+    text-anchor="middle"
+    fill="#1C1915"
+    font-family="Georgia, 'Iowan Old Style', 'Palatino Linotype', Palatino, serif"
+    font-size="58"
+    font-weight="500"
+    letter-spacing="0.5"
+  >ForeverFile</text>
+</svg>

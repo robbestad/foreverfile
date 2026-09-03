@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="brand/foreverfile-lockup.jpg" alt="ForeverFile" width="420">
+  <img src="brand/foreverfile-lockup.svg" alt="ForeverFile" width="420">
 </p>
 
 <p align="center">
