@@ -1,6 +1,6 @@
 {
   "name": "foreverfile",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "A permanent place for important files. Publish a public record that cannot silently change.",
   "license": "MIT",
   "author": "Sven Anders Robbestad",
