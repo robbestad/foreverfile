@@ -1,8 +1,7 @@
 import { ButtonLink } from "@/components/button";
 import { PageShell } from "@/components/page-shell";
-import { ProductDemo } from "@/components/product-demo";
 import { PropertyList } from "@/components/property-list";
-import { ScenarioRecords } from "@/components/scenario-records";
+import { RecentRecords } from "@/components/recent-records";
 import { VerifyPanel } from "@/components/verify-panel";
 import { WhatThisIsNot } from "@/components/what-this-is-not";
 import { COPY } from "@/lib/copy";
@@ -24,9 +23,8 @@ export const HomePage = create<PageProps>({
           </ButtonLink>
         </div>
 
-        <ProductDemo />
         <PropertyList />
-        <ScenarioRecords />
+        <RecentRecords />
 
         <section className="mt-16 sm:mt-20">
           <VerifyPanel home />

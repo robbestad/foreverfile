@@ -5,6 +5,10 @@ import { matchRoute, navigate } from "./router";
 import { App } from "./app";
 import { routes, metadataForPath, RECORD_SHELL_ID, syncDocumentMetadata } from "./site";
 import { deferred } from "./test/helpers";
+vi.mock("./lib/arweave", async (original) => ({
+  ...await original<typeof import("./lib/arweave")>(),
+  recentForeverfiles: vi.fn().mockResolvedValue([]),
+}));
 const root = document.createElement("div");
 document.body.append(root);
 const originalRoutes = [...routes];
