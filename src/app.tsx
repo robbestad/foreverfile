@@ -2,6 +2,7 @@ import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { isInternalLink, matchRoute, navigate } from "@/router";
 import { loadRoute, NotFoundPage, routes, syncDocumentMetadata } from "@/site";
+import { upload } from "@/stores/upload";
 import { create, flushSync } from "svenjs";
 
 const EMPTY_PARAMS: Record<string, string> = {};
@@ -13,6 +14,7 @@ type ShellProps = {
 type ShellState = {
   path: string;
   search: string;
+  routeError?: boolean;
 };
 
 export const App = create<ShellProps, ShellState>({
@@ -27,41 +29,44 @@ export const App = create<ShellProps, ShellState>({
     };
   },
   onMount() {
+    this.observe(upload);
+    this._navigation = 0;
     syncDocumentMetadata(location.pathname);
     if (location.search !== this.state.search) {
       this.setState({ ...this.state, search: location.search });
     }
-    this._applyLocation = () => {
-      flushSync(() => {
-        this.setState({
-          path: location.pathname,
-          search: location.search,
-        });
-      });
-      syncDocumentMetadata(location.pathname);
-      const main = document.getElementById("main");
-      const heading = main?.querySelector("h1");
-      heading?.setAttribute("tabindex", "-1");
-      heading?.focus();
-    };
-    this._onPop = () => {
-      void loadRoute(location.pathname).then(() => this._applyLocation());
+    this._onPop = async () => {
+      const generation = ++this._navigation;
+      const { pathname: path, search } = location;
+      try {
+        await loadRoute(path);
+        if (generation !== this._navigation) return;
+        syncDocumentMetadata(path);
+        flushSync(() => this.setState({ path, search, routeError: false }));
+        const heading = document.getElementById("main")?.querySelector("h1");
+        heading?.setAttribute("tabindex", "-1");
+        heading?.focus();
+      } catch {
+        if (generation !== this._navigation) return;
+        this.setState({ path, search, routeError: true });
+      }
     };
     this._onClick = (event: MouseEvent) => {
       const a = (event.target as Element | null)?.closest?.(
         "a",
       ) as HTMLAnchorElement | null;
-      if (!a || !isInternalLink(a, event) || !matchRoute(a.pathname, routes)) {
+      if (!a || !isInternalLink(a, event)) {
         return;
       }
       event.preventDefault();
       const to = a.pathname + a.search + a.hash;
-      void loadRoute(a.pathname).then(() => navigate(to));
+      navigate(to);
     };
     window.addEventListener("popstate", this._onPop);
     this._root?.addEventListener("click", this._onClick);
   },
   onDestroy() {
+    this._navigation++;
     window.removeEventListener("popstate", this._onPop);
     this._root?.removeEventListener("click", this._onClick);
   },
@@ -80,8 +85,9 @@ export const App = create<ShellProps, ShellState>({
         ref={(el: HTMLElement | null) => (this._root = el)}
       >
         <SiteHeader />
+        {upload.get().status !== "idle" ? <aside className="border-b border-rule px-6 py-3" aria-live="polite"><a href="/publish">Publication: {upload.get().status} · {Math.round(upload.get().progress)}% — open upload session</a></aside> : null}
         <main className="flex-1" id="main">
-          <Page params={params} search={this.state.search} />
+          {this.state.routeError ? <div role="alert" className="p-8"><h1>Could not load this page</h1><button onClick={() => location.reload()}>Reload page</button></div> : <Page params={params} search={this.state.search} />}
         </main>
         <SiteFooter />
       </div>

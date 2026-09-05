@@ -25,4 +25,12 @@ void loadRoute(location.pathname).then(() => {
   } else {
     render(tree, root);
   }
+}).catch(() => {
+  root.replaceChildren();
+  const message = document.createElement("p");
+  message.textContent = "Could not load this page.";
+  const retry = document.createElement("button");
+  retry.textContent = "Reload page";
+  retry.onclick = () => location.reload();
+  root.append(message, retry);
 });

@@ -28,8 +28,8 @@ function previewRoutes(): Plugin {
   return {
     name: "preview-routes",
     configurePreviewServer(server) {
-      return () => {
-        server.middlewares.use((req, res, next) => {
+      // Handle application entries before Vite tries to decode malformed paths.
+      server.middlewares.use((req, res, next) => {
           if (res.headersSent) return next();
           const url = new URL(req.url ?? "/", "http://localhost");
           const file = pageFile(url.pathname);
@@ -47,8 +47,7 @@ function previewRoutes(): Plugin {
           res.statusCode = 404;
           res.setHeader("Content-Type", "text/html; charset=utf-8");
           createReadStream(dest).pipe(res);
-        });
-      };
+      });
     },
   };
 }
@@ -56,6 +55,7 @@ function previewRoutes(): Plugin {
 export default defineConfig(({ isSsrBuild, isPreview, command, mode }) => ({
   appType: isPreview || (command === "serve" && mode === "production") ? "mpa" : "spa",
   plugins: isSsrBuild ? [] : [tailwindcss(), previewRoutes()],
+  esbuild: { jsx: "automatic", jsxImportSource: "svenjs" },
   resolve: {
     alias: {
       "@": resolve(root, "src"),
