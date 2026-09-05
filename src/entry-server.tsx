@@ -33,7 +33,7 @@ function renderHead(metadata: PageMetadata) {
     `<meta name="description" content="${description}" />`,
     `<meta name="robots" content="${robots}" />`,
   ];
-  if (!metadata.noIndex) {
+  if (!metadata.noIndex && !metadata.omitCanonical) {
     const canonical = escapeHtml(canonicalUrl(metadata));
     lines.push(
       `<link rel="canonical" href="${canonical}" />`,

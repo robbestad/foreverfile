@@ -1,7 +1,7 @@
 import { Button } from "@/components/button";
 import { RecordSheet } from "@/components/record-sheet";
 import { Stamp } from "@/components/stamp";
-import { fetchPublishedBytes, getRecord } from "@/lib/arweave";
+import { fetchPublishedBytes, getRecord, FileTooLargeError } from "@/lib/arweave";
 import { COPY } from "@/lib/copy";
 import { formatBytes, formatPublishedDate } from "@/lib/format";
 import { identitiesMatch, sha256Blob, sha256Hex } from "@/lib/hash";
@@ -143,13 +143,21 @@ export const VerifyPanel = create<VerifyPanelProps, VerifyPanelState>({
       outcome: { kind: "idle" },
     };
   },
+  onMount() {
+    this._seeded = this.props.initialRecord ?? "";
+    this._generation = 0;
+  },
+  _invalidate() {
+    this._generation = (this._generation ?? 0) + 1;
+    this._controller?.abort();
+  },
+  onDestroy() { this._invalidate(); },
   onUpdate() {
     const next = this.props.initialRecord ?? "";
     if (this._seeded !== next) {
       this._seeded = next;
-      if (next && next !== this.state.link) {
-        this.setState({ ...this.state, link: next });
-      }
+      this._invalidate();
+      this.setState({ ...this.state, link: next, outcome: { kind: "idle" } });
     }
   },
   render() {
@@ -159,105 +167,42 @@ export const VerifyPanel = create<VerifyPanelProps, VerifyPanelState>({
 
     const onSubmit = async (event: Event) => {
       event.preventDefault();
-      const id = parseRecordId(this.state.link);
-      if (!this.state.link.trim() && !this.state.file) {
-        this.setState({ ...this.state, outcome: { kind: "file-missing" } });
-        return;
-      }
-      if (!id) {
-        this.setState({ ...this.state, outcome: { kind: "invalid" } });
-        return;
-      }
-
-      this.setState({ ...this.state, outcome: { kind: "verifying" } });
+      this._invalidate();
+      const generation = this._generation;
+      const controller = new AbortController();
+      this._controller = controller;
+      const { link, file: selected } = this.state;
+      const finish = (outcome: Outcome) => {
+        if (generation === this._generation && !controller.signal.aborted) this.setState({ ...this.state, outcome });
+      };
+      const id = parseRecordId(link);
+      if (!link.trim() && !selected) { finish({ kind: "file-missing" }); return; }
+      if (!id) { finish({ kind: "invalid" }); return; }
+      if (selected && selected.size > FILE_SIZE_WARN_BYTES) { finish({ kind: "too-large" }); return; }
+      finish({ kind: "verifying" });
       try {
-        const record = await getRecord(id);
-        if (!record) {
-          this.setState({ ...this.state, outcome: { kind: "not-found" } });
-          return;
-        }
-        const selected = this.state.file;
-        if (!selected) {
-          this.setState({
-            ...this.state,
-            outcome: record.timestamp
-              ? { kind: "found", record }
-              : { kind: "pending", record },
-          });
-          return;
-        }
-
+        const result = await getRecord(id, controller.signal);
+        controller.signal.throwIfAborted();
+        if (result.kind === "not-found") { finish({ kind: "not-found" }); return; }
+        if (result.kind === "pending") { finish({ kind: "error", message: "This transaction is pending. Please try again." }); return; }
+        const record = result.record;
+        if (!selected) { finish({ kind: record.timestamp !== null ? "found" : "pending", record }); return; }
+        if (record.size > FILE_SIZE_WARN_BYTES) { finish({ kind: "too-large", record }); return; }
         const localHash = await sha256Blob(selected);
-        const tooLarge = selected.size > FILE_SIZE_WARN_BYTES;
-
-        if (record.sha256 && identitiesMatch(localHash, record.sha256)) {
-          if (tooLarge) {
-            this.setState({
-              ...this.state,
-              outcome: record.timestamp
-                ? { kind: "verified", record }
-                : { kind: "verified-pending", record },
-            });
-            return;
-          }
-          const published = await sha256Hex(await fetchPublishedBytes(record.id));
-          if (!identitiesMatch(published, record.sha256)) {
-            this.setState({ ...this.state, outcome: { kind: "integrity", record } });
-            return;
-          }
-          if (!identitiesMatch(localHash, published)) {
-            this.setState({ ...this.state, outcome: { kind: "mismatch", record } });
-            return;
-          }
-          this.setState({
-            ...this.state,
-            outcome: record.timestamp
-              ? { kind: "verified", record }
-              : { kind: "verified-pending", record },
-          });
-          return;
+        controller.signal.throwIfAborted();
+        const bytes = await fetchPublishedBytes(id, controller.signal, record.size);
+        controller.signal.throwIfAborted();
+        const published = await sha256Hex(bytes);
+        if (record.sha256 && !identitiesMatch(published, record.sha256)) {
+          finish({ kind: "integrity", record });
+        } else if (!identitiesMatch(localHash, published)) {
+          finish({ kind: "mismatch", record });
+        } else {
+          finish({ kind: record.timestamp !== null ? "verified" : "verified-pending", record });
         }
-
-        if (record.sha256 && !identitiesMatch(localHash, record.sha256)) {
-          if (tooLarge) {
-            this.setState({ ...this.state, outcome: { kind: "mismatch", record } });
-            return;
-          }
-          const published = await sha256Hex(await fetchPublishedBytes(record.id));
-          if (!identitiesMatch(published, record.sha256)) {
-            this.setState({ ...this.state, outcome: { kind: "integrity", record } });
-            return;
-          }
-          this.setState({ ...this.state, outcome: { kind: "mismatch", record } });
-          return;
-        }
-
-        if (tooLarge) {
-          this.setState({ ...this.state, outcome: { kind: "too-large", record } });
-          return;
-        }
-
-        const published = await sha256Hex(await fetchPublishedBytes(record.id));
-        if (identitiesMatch(localHash, published)) {
-          this.setState({
-            ...this.state,
-            outcome: record.timestamp
-              ? { kind: "verified", record }
-              : { kind: "verified-pending", record },
-          });
-          return;
-        }
-        this.setState({ ...this.state, outcome: { kind: "mismatch", record } });
       } catch (err) {
-        this.setState({
-          ...this.state,
-          outcome: {
-            kind: "error",
-            message:
-              err instanceof Error
-                ? err.message
-                : "Could not verify that record.",
-          },
+        finish(err instanceof FileTooLargeError ? { kind: "too-large" } : {
+          kind: "error", message: err instanceof Error ? err.message : "Could not verify that record. Please try again.",
         });
       }
     };
@@ -282,9 +227,11 @@ export const VerifyPanel = create<VerifyPanelProps, VerifyPanelState>({
               id="verify-link"
               value={link}
               onInput={(event: Event) => {
+                this._invalidate();
                 this.setState({
                   ...this.state,
                   link: (event.target as HTMLInputElement).value,
+                  outcome: { kind: "idle" },
                 });
               }}
               placeholder={COPY.verify.pastePlaceholder}
@@ -300,9 +247,11 @@ export const VerifyPanel = create<VerifyPanelProps, VerifyPanelState>({
               type="file"
               onChange={(event: Event) => {
                 const input = event.target as HTMLInputElement;
+                this._invalidate();
                 this.setState({
                   ...this.state,
                   file: input.files?.[0] ?? null,
+                  outcome: { kind: "idle" },
                 });
                 input.value = "";
               }}

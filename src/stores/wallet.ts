@@ -10,12 +10,25 @@ const locked: WalletState = { status: "locked", jwk: null, address: null };
 
 export const wallet = createStore<WalletState>({ state: locked });
 
-export async function unlockWallet(raw: string) {
+let walletGeneration = 0;
+export function walletRevision() { return walletGeneration; }
+
+export async function unlockWallet(raw: string, signal?: AbortSignal): Promise<boolean> {
+  const generation = ++walletGeneration;
   const jwk = parseArweaveJwk(raw);
-  const address = await addressFromJwk(jwk);
+  let address: string;
+  try {
+    address = await addressFromJwk(jwk);
+  } catch (error) {
+    if (signal?.aborted || generation !== walletGeneration) return false;
+    throw error;
+  }
+  if (signal?.aborted || generation !== walletGeneration) return false;
   wallet.set({ status: "unlocked", jwk, address });
+  return true;
 }
 
 export function lockWallet() {
+  walletGeneration++;
   wallet.set(locked);
 }

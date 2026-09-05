@@ -70,7 +70,7 @@ export const COPY = {
     writing: "Writing the record…",
     emptyFile: "That file is empty.",
     largeFile:
-      "This file is over 25 MB. Publishing from the browser may be slow or fail.",
+      "Files must be 25 MiB or smaller for publishing.",
   },
   record: {
     kicker: "Record",
@@ -104,7 +104,7 @@ export const COPY = {
     notFound: "No public record for that link.",
     pending: "Record found. Publication time is still landing.",
     fileMissing: "Paste a link, or choose a local file.",
-    tooLarge: "Too large to compare in this browser.",
+    tooLarge: "Byte verification supports files up to 25 MiB. You can still look up metadata without selecting a local file.",
     found: "Record found.",
     integrity: "The stored file doesn't match its published identity.",
     invalid: "That doesn't look like a ForeverFile link.",

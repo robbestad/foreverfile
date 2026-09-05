@@ -5,6 +5,7 @@ import { defineConfig } from "vitest/config";
 const root = dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
+  esbuild: { jsx: "automatic", jsxImportSource: "svenjs" },
   resolve: {
     alias: {
       "@": resolve(root, "src"),
@@ -12,6 +13,7 @@ export default defineConfig({
   },
   test: {
     environment: "node",
-    include: ["src/lib/**/*.test.ts"],
+    setupFiles: ["src/test/dom-setup.ts"],
+    include: ["src/**/*.test.{ts,tsx}"],
   },
 });

@@ -63,6 +63,7 @@ export type PageMetadata = {
   description: string;
   path: string;
   canonicalPath?: string;
+  omitCanonical?: boolean;
   noIndex?: boolean;
   socialImage?: string;
   socialImageAlt?: string;
@@ -103,9 +104,10 @@ export function normalizePath(pathname: string) {
 export function metadataForPath(pathname: string): PageMetadata {
   const path = normalizePath(pathname);
 
-  if (path.startsWith("/f/")) {
+  if (/^\/f\/[a-zA-Z0-9_-]{43}$/.test(path)) {
     return {
       path,
+      omitCanonical: path === `/f/${RECORD_SHELL_ID}`,
       title: `Record · ${SITE_NAME}`,
       description: `ForeverFile record. A public, unchangeable published file.`,
     };
@@ -137,8 +139,14 @@ export function titleForDocument(metadata: PageMetadata) {
 }
 
 function setMeta(selector: string, attribute: string, value: string) {
-  const element = document.head.querySelector(selector);
-  element?.setAttribute(attribute, value);
+  let element = document.head.querySelector(selector);
+  if (!element) {
+    const match = selector.match(/^(meta|link)\[(name|property|rel)="([^"]+)"\]$/)!;
+    element = document.createElement(match[1]);
+    element.setAttribute(match[2], match[3]);
+    document.head.append(element);
+  }
+  element.setAttribute(attribute, value);
 }
 
 export function syncDocumentMetadata(pathname: string) {
@@ -155,12 +163,12 @@ export function syncDocumentMetadata(pathname: string) {
     "content",
     metadata.noIndex ? "noindex, nofollow" : "index, follow",
   );
-  if (metadata.noIndex) {
+  if (metadata.noIndex || metadata.omitCanonical) {
     document.head.querySelector('link[rel="canonical"]')?.remove();
+    document.head.querySelector('meta[property="og:url"]')?.remove();
   } else {
     const canonical = canonicalUrl(metadata);
-    const link = document.head.querySelector('link[rel="canonical"]');
-    if (link) link.setAttribute("href", canonical);
+    setMeta('link[rel="canonical"]', "href", canonical);
     setMeta('meta[property="og:url"]', "content", canonical);
   }
   setMeta('meta[property="og:title"]', "content", title);
