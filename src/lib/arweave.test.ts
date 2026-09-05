@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import Arweave from "arweave";
-import { checkFileSize, createArweave, fetchPublishedBytes, getRecord, listForeverfiles, quotePrice, getBalance } from "./arweave";
+import { recentForeverfiles, checkFileSize, createArweave, fetchPublishedBytes, getRecord, listForeverfiles, quotePrice, getBalance } from "./arweave";
 import { FILE_SIZE_WARN_BYTES as MAX } from "./tags";
 const id = "a".repeat(43);
 const node = { id, data: { size: "1" }, tags: [], block: null };
@@ -97,4 +97,15 @@ it("aborts the body stream when the caller cancels a download", async () => {
   }));
   const pending = expect(fetchPublishedBytes(id, controller.signal)).rejects.toThrow("cancelled");
   await Promise.resolve(); controller.abort(new Error("cancelled")); await pending;
+});
+
+it("loads recent public ForeverFile records without requiring a wallet", async () => {
+  const fetch = vi.fn().mockResolvedValue(json({ data: { transactions: { edges: [{ node }] } } }));
+  vi.stubGlobal("fetch", fetch);
+  expect(await recentForeverfiles()).toEqual([expect.objectContaining({ id, size: 1 })]);
+  const { query, variables } = JSON.parse(fetch.mock.calls[0][1].body);
+  expect(query).toContain('values: ["foreverfile"]');
+  expect(query).toContain("first: 4");
+  expect(query).not.toContain("owners:");
+  expect(variables).toEqual({});
 });

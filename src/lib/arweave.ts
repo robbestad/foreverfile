@@ -35,6 +35,11 @@ const FILES_QUERY = `query ForeverfileLibrary($owner: String!, $after: String) {
     pageInfo { hasNextPage } edges { cursor node { ${FIELDS} } }
   }
 }`;
+const RECENT_RECORDS_QUERY = `query RecentForeverfiles {
+  transactions(tags: [{ name: "App-Name", values: ["${APP_NAME}"] }], first: 4, sort: HEIGHT_DESC) {
+    edges { node { ${FIELDS} } }
+  }
+}`;
 const RECORD_QUERY = `query ForeverfileRecord($id: ID!) { transaction(id: $id) { ${FIELDS} } }`;
 
 export async function addressFromJwk(jwk: ArweaveJwk): Promise<string> {
@@ -91,6 +96,12 @@ async function graphql(query: string, variables: Record<string, string | null>, 
   if (!payload || payload.errors?.length || !payload.data) throw new Error("The public network returned an invalid response. Please try again.");
   return payload.data;
 }
+export async function recentForeverfiles(signal?: AbortSignal): Promise<ForeverFileRecord[]> {
+  const data = await graphql(RECENT_RECORDS_QUERY, {}, signal);
+  if (!Array.isArray(data.transactions?.edges)) invalid();
+  return data.transactions.edges.map((edge: any) => nodeToRecord(edge?.node));
+}
+
 export async function listForeverfiles(owner: string, after: string | null = null, signal?: AbortSignal): Promise<LibraryPage> {
   const data = await graphql(FILES_QUERY, { owner, after }, signal);
   const txs = data.transactions;
