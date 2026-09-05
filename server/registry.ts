@@ -4,6 +4,7 @@ import type { RecordResult } from "../src/lib/arweave.js";
 
 export interface RegistryStore {
   save(id: string, record: ForeverFileRecord | null): Promise<void>;
+  removePending(id: string): Promise<void>;
   find(id: string): Promise<ForeverFileRecord | null>;
   recent(): Promise<ForeverFileRecord[]>;
   pending(): Promise<string[]>;
@@ -27,7 +28,10 @@ export function createRegistry(store: RegistryStore, lookup: Lookup, discover?: 
       await store.save(id, null);
       return { kind: "pending" } as const;
     }
-    if (result.record.appName !== APP_NAME) throw new RegistryError(422, "This transaction was not published with ForeverFile.");
+    if (result.record.appName !== APP_NAME) {
+      await store.removePending(id);
+      throw new RegistryError(422, "This transaction was not published with ForeverFile.");
+    }
     await store.save(id, result.record);
     return result;
   }

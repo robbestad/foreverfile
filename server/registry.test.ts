@@ -69,3 +69,21 @@ it("accepts only an ID and rejects client metadata, keys, files and oversized bo
   const read = await handler(new Request(`https://example.test/api/records?id=${id}`));
   expect(await read.json()).toEqual({ record });
 });
+
+it("removes unrelated pending transactions from storage and future refreshes", async () => {
+  const registry = createRegistry(store, lookup);
+  lookup.mockResolvedValueOnce({ kind: "pending" });
+  await registry.register(id);
+  await db.exec("UPDATE foreverfile_records SET checked_at = now() - interval '1 minute'");
+  lookup.mockResolvedValue({ kind: "found", record: { ...record, appName: "other" } });
+  expect(await registry.recent()).toEqual([]);
+  expect((await db.query("SELECT * FROM foreverfile_records")).rows).toEqual([]);
+  lookup.mockClear();
+  await registry.recent();
+  expect(lookup).not.toHaveBeenCalled();
+});
+it("does not delete validated metadata during pending cleanup", async () => {
+  await store.save(id, record);
+  await store.removePending(id);
+  expect(await store.find(id)).toEqual(record);
+});

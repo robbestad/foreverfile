@@ -169,7 +169,8 @@ receipt metadata in another browser while the gateway is unavailable.
 2. Set the server-only `DATABASE_URL` in the required Vercel environments. Never
    give it a `VITE_` prefix or commit it. No database credentials are currently
    included in this repository.
-3. With `DATABASE_URL` set locally (or in `.env.local`), run `npm run db:migrate`.
+3. With `DATABASE_URL` set in your environment, run `npm run db:migrate`.
+   If the connection is in `.env.local`, use `node --env-file=.env.local scripts/migrate-registry.mjs` instead.
    The additive, repeatable migration creates the metadata table and indexes.
 4. Redeploy the project. `GET /api/records` should return `{ "records": [] }`
    until a transaction is registered or discovered. `POST` returns `202` only

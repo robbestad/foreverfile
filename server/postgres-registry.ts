@@ -16,6 +16,10 @@ export function postgresRegistry(query: Query): RegistryStore {
           checked_at = now()`,
         [id, record === null ? null : JSON.stringify(record)]);
     },
+    async removePending(id) {
+      // Preserve validated metadata if another request saved it concurrently.
+      await query("DELETE FROM foreverfile_records WHERE id = $1 AND record IS NULL", [id]);
+    },
     async find(id) {
       const rows = await query("SELECT record FROM foreverfile_records WHERE id = $1", [id]);
       return rows[0]?.record as ForeverFileRecord | null ?? null;
