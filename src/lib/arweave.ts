@@ -36,7 +36,7 @@ const FILES_QUERY = `query ForeverfileLibrary($owner: String!, $after: String) {
   }
 }`;
 const RECENT_RECORDS_QUERY = `query RecentForeverfiles {
-  transactions(tags: [{ name: "App-Name", values: ["${APP_NAME}"] }], first: 4, sort: HEIGHT_DESC) {
+  transactions(tags: [{ name: "App-Name", values: ["${APP_NAME}"] }], first: 20, sort: HEIGHT_DESC) {
     edges { node { ${FIELDS} } }
   }
 }`;
@@ -99,7 +99,18 @@ async function graphql(query: string, variables: Record<string, string | null>, 
 export async function recentForeverfiles(signal?: AbortSignal): Promise<ForeverFileRecord[]> {
   const data = await graphql(RECENT_RECORDS_QUERY, {}, signal);
   if (!Array.isArray(data.transactions?.edges)) invalid();
-  return data.transactions.edges.map((edge: any) => nodeToRecord(edge?.node));
+  const records: ForeverFileRecord[] = [];
+  for (const edge of data.transactions.edges) {
+    try {
+      const record = nodeToRecord(edge?.node);
+      if (!records.some((item) => item.id === record.id)) records.push(record);
+    } catch {
+      // Public tags are untrusted: one malformed entry must not hide the feed.
+      continue;
+    }
+    if (records.length === 4) break;
+  }
+  return records;
 }
 
 export async function listForeverfiles(owner: string, after: string | null = null, signal?: AbortSignal): Promise<LibraryPage> {

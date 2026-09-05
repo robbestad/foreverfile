@@ -105,7 +105,14 @@ it("loads recent public ForeverFile records without requiring a wallet", async (
   expect(await recentForeverfiles()).toEqual([expect.objectContaining({ id, size: 1 })]);
   const { query, variables } = JSON.parse(fetch.mock.calls[0][1].body);
   expect(query).toContain('values: ["foreverfile"]');
-  expect(query).toContain("first: 4");
+  expect(query).toContain("first: 20");
   expect(query).not.toContain("owners:");
   expect(variables).toEqual({});
+});
+
+it("skips malformed public entries and returns up to four valid records", async () => {
+  const malformed = [null, { ...node, data: { size: "bad" } }, { ...node, block: { timestamp: -1 } }, { ...node, tags: [{ name: "File-SHA256", value: "fake" }] }];
+  const valid = ["b", "c", "d", "e", "f"].map((letter) => ({ ...node, id: letter.repeat(43) }));
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(json({ data: { transactions: { edges: [...malformed, ...valid].map(node => ({ node })) } } })));
+  expect((await recentForeverfiles()).map(record => record.id)).toEqual(valid.slice(0, 4).map(record => record.id));
 });
