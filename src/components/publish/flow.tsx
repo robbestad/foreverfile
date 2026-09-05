@@ -5,9 +5,11 @@ import { StepRail } from "@/components/publish/step-rail";
 import {
   getBalance,
   quotePrice,
-  uploadFile,
+  checkFileSize,
   type Amount,
 } from "@/lib/arweave";
+import { Button } from "@/components/button";
+import { upload, prepareUpload, resumeUpload, endUpload, hasUnfinishedUpload } from "@/stores/upload";
 import { COPY } from "@/lib/copy";
 import { sha256Blob } from "@/lib/hash";
 import { recordPath } from "@/lib/record";
@@ -54,6 +56,7 @@ const initial: FlowState = {
 };
 
 type WritingProps = {
+  title?: string;
   progress: number | null;
   error: string | null;
 };
@@ -64,7 +67,7 @@ const WritingProgress = create<WritingProps>({
     return (
       <div>
         <h1 className="font-display mt-6 text-4xl leading-tight text-ink sm:text-5xl">
-          {COPY.publish.writing}
+          {this.props.title ?? COPY.publish.writing}
         </h1>
         <p className="mt-3 text-muted">
           Signed here, then written as a public record.
@@ -100,24 +103,66 @@ const WritingProgress = create<WritingProps>({
 export const PublishFlow = create<Record<string, never>, FlowState>({
   initialState: initial,
   onMount() {
-    this.observe(wallet);
+    this._alive = true;
     this._fileGen = 0;
-    this._loadedBalanceFor = null;
+    this._balanceGen = 0;
+    this._loadedBalanceFor = undefined;
+    this._following = hasUnfinishedUpload();
+    this.observe(wallet);
+    this.observe(upload);
+    this._sync();
   },
-  onUpdate() {
-    const session = wallet.get();
-    if (
-      session.status === "unlocked" &&
-      this._loadedBalanceFor !== session.address
-    ) {
-      this._loadedBalanceFor = session.address;
-      void getBalance(session.address)
-        .then((balance) => {
-          this.setState({ ...this.state, balance });
-        })
-        .catch(() => {
-          this.setState({ ...this.state, balance: undefined });
-        });
+  onUpdate() { this._sync(); },
+  onDestroy() {
+    this._alive = false;
+    this._fileGen++;
+    this._balanceGen++;
+    this._priceController?.abort();
+    this._balanceController?.abort();
+  },
+  _sync() {
+    const address = wallet.get().address;
+    if (this._loadedBalanceFor !== address) {
+      this._loadedBalanceFor = address;
+      this._balanceGen++;
+      this._balanceController?.abort();
+      this.setState({ ...this.state, balance: undefined });
+      if (address) this._loadBalance();
+    }
+    const transfer = upload.get();
+    if (this._following && transfer.status === "complete" && transfer.record && location.pathname === "/publish") {
+      this._following = false;
+      navigate(`${recordPath(transfer.record.id)}?new=1`);
+    }
+    if (transfer.status === "complete" && this.state.file) this.setState({ ...initial });
+  },
+  _loadBalance() {
+    const address = wallet.get().address;
+    if (!address) return;
+    const generation = ++this._balanceGen;
+    this._balanceController?.abort();
+    const controller = new AbortController();
+    this._balanceController = controller;
+    void getBalance(address, controller.signal).then((balance) => {
+      if (!this._alive || generation !== this._balanceGen || wallet.get().address !== address) return;
+      this.setState({ ...this.state, balance });
+    }).catch(() => {
+      if (!this._alive || generation !== this._balanceGen || wallet.get().address !== address) return;
+      this.setState({ ...this.state, balance: undefined });
+    });
+  },
+  async _quote(file: File, generation: number) {
+    this._priceController?.abort();
+    const controller = new AbortController();
+    this._priceController = controller;
+    this.setState({ ...this.state, feeLoading: true, feeError: false });
+    try {
+      const fee = await quotePrice(file.size, controller.signal);
+      if (!this._alive || generation !== this._fileGen || controller.signal.aborted) return;
+      this.setState({ ...this.state, fee, feeLoading: false, feeError: false });
+    } catch {
+      if (!this._alive || generation !== this._fileGen || controller.signal.aborted) return;
+      this.setState({ ...this.state, fee: undefined, feeLoading: false, feeError: true });
     }
   },
   render() {
@@ -139,6 +184,7 @@ export const PublishFlow = create<Record<string, never>, FlowState>({
 
     const takeFile = async (next: File | null) => {
       const gen = ++this._fileGen;
+      this._priceController?.abort();
       this.setState({
         ...this.state,
         error: null,
@@ -162,7 +208,7 @@ export const PublishFlow = create<Record<string, never>, FlowState>({
         });
         return;
       }
-      if (next.size === 0) {
+      if (next.size === 0 || next.size > 25 * 1024 * 1024) {
         this.setState({
           ...this.state,
           file: null,
@@ -170,7 +216,7 @@ export const PublishFlow = create<Record<string, never>, FlowState>({
           hashing: false,
           fee: undefined,
           feeLoading: false,
-          error: COPY.publish.emptyFile,
+          error: next.size === 0 ? COPY.publish.emptyFile : "Files must be 25 MiB or smaller.",
           acks: emptyAcks,
           progress: null,
         });
@@ -189,20 +235,19 @@ export const PublishFlow = create<Record<string, never>, FlowState>({
         feeError: false,
       });
       try {
-        const [nextHash, nextFee] = await Promise.all([
-          sha256Blob(next),
-          quotePrice(next.size),
-        ]);
+        checkFileSize(next.size);
+        const nextHash = await sha256Blob(next);
         if (gen !== this._fileGen) return;
         this.setState({
           ...this.state,
           file: next,
           sha256: nextHash,
           hashing: false,
-          fee: nextFee,
+          fee: undefined,
           feeLoading: false,
           feeError: false,
         });
+        void this._quote(next, gen);
       } catch {
         if (gen !== this._fileGen) return;
         this.setState({
@@ -219,30 +264,19 @@ export const PublishFlow = create<Record<string, never>, FlowState>({
     };
 
     const publish = async () => {
-      const current = wallet.get();
-      if (!this.state.file || current.status !== "unlocked") return;
-      this.setState({
-        ...this.state,
-        error: null,
-        step: "writing",
-        progress: 0,
-      });
+      const { file, acks, sha256, fee, feeLoading } = this.state;
+      if (!file || !sha256 || !fee || feeLoading) return;
       try {
-        const item = await uploadFile(
-          this.state.file,
-          current.jwk,
-          ({ pctComplete }) => {
-            this.setState({ ...this.state, progress: pctComplete });
-          },
-        );
-        navigate(`${recordPath(item.id)}?new=1`);
+        if (hasUnfinishedUpload()) throw new Error("Resume or end the existing upload first.");
+        if (!acks.isPublic || !acks.irreversible || !acks.notPrivate) throw new Error("Confirm all publication consequences first.");
+        this._following = true;
+        this.setState({ ...this.state, error: null });
+        await prepareUpload(file, acks);
+        // Ready status exposes the ID before the user starts the first transfer.
       } catch (err) {
-        this.setState({
-          ...this.state,
-          error: err instanceof Error ? err.message : "Publishing failed.",
-          progress: null,
-          step: wallet.get().status === "unlocked" ? "authorize" : "review",
-        });
+        if (!this._alive) return;
+        this._following = false;
+        this.setState({ ...this.state, error: err instanceof Error ? err.message : "Publishing failed." });
       }
     };
 
@@ -254,11 +288,26 @@ export const PublishFlow = create<Record<string, never>, FlowState>({
       this.setState({ ...this.state, error: null, step: "authorize" });
     };
 
+    const transfer = upload.get();
+    if (hasUnfinishedUpload() || transfer.status === "complete") {
+      return <div>
+        <WritingProgress title={transfer.status === "complete" ? "Publication received" : transfer.status === "preparing" ? "Preparing publication…" : transfer.status === "ready" ? "Ready to publish" : transfer.status === "error" ? "Transfer paused" : COPY.publish.writing} progress={transfer.progress} error={transfer.error} />
+        <p className="mt-4">{transfer.status === "preparing" ? "Preparing and signing…" : transfer.status === "complete" ? "Received by the network. Confirmation is pending." : transfer.status === "ready" ? "Signed and ready to send." : transfer.status === "error" ? "Transfer paused." : "Sending to the network…"}</p>
+        {transfer.record ? <p className="mt-4 break-all font-mono"><a href={recordPath(transfer.record.id)}>{transfer.record.id}</a></p> : null}
+        {transfer.status === "ready" || transfer.status === "error" ? <Button type="button" onClick={() => { this._following = true; void resumeUpload(); }}>{transfer.status === "ready" ? "Send signed transaction" : "Resume same transaction"}</Button> : null}
+        {transfer.status !== "complete" ? <p className="mt-4 text-sm text-muted">Ending this session cannot undo any bytes already sent. Retrying a new publication could charge another fee.</p> : null}
+        <Button type="button" variant="ghost" onClick={() => { this._following = false; endUpload(); this.setState({ ...initial }); }}>{transfer.status === "complete" ? "Publish another file" : "End session and release file"}</Button>
+      </div>;
+    }
+
     const railIndex = step === "choose" ? 0 : step === "review" ? 1 : 2;
 
     return (
       <div>
         <StepRail current={railIndex} />
+        {error && step === "authorize" ? <p role="alert" className="mt-4 text-stamp">{error}</p> : null}
+        {file && sha256 ? <Button type="button" variant="ghost" disabled={feeLoading} onClick={() => { void this._quote(file, this._fileGen); this._loadBalance(); }}>Refresh fee and balance</Button> : null}
+        {session.status === "unlocked" && !balance ? <p className="mt-4 text-muted">Balance unavailable. Refresh to try again.</p> : null}
 
         {step === "choose" ? (
           <ChooseStep

@@ -21,6 +21,11 @@ export const KeyForm = create<KeyFormProps, KeyFormState>({
     error: null,
     pending: false,
   },
+  _invalidate() {
+    this._generation = (this._generation ?? 0) + 1;
+    this._controller?.abort();
+  },
+  onDestroy() { this._invalidate(); },
   render() {
     const submitLabel = this.props.submitLabel ?? "Authorize";
     const { raw, fileName, error, pending } = this.state;
@@ -30,8 +35,12 @@ export const KeyForm = create<KeyFormProps, KeyFormState>({
       const file = input.files?.[0];
       input.value = "";
       if (!file) return;
+      this._invalidate();
+      const generation = this._generation;
+      this.setState({ ...this.state, pending: false });
       try {
         const text = await file.text();
+        if (generation !== this._generation) return;
         this.setState({
           ...this.state,
           raw: text,
@@ -39,16 +48,23 @@ export const KeyForm = create<KeyFormProps, KeyFormState>({
           error: null,
         });
       } catch {
+        if (generation !== this._generation) return;
         this.setState({ ...this.state, error: "Could not read that file." });
       }
     };
 
     const onSubmit = async (event: Event) => {
       event.preventDefault();
+      this._invalidate();
+      const generation = this._generation;
+      const controller = new AbortController();
+      this._controller = controller;
       this.setState({ ...this.state, error: null, pending: true });
       try {
-        await unlockWallet(this.state.raw);
+        await unlockWallet(this.state.raw, controller.signal);
+        if (generation === this._generation) this.setState({ ...this.state, pending: false });
       } catch (err) {
+        if (generation !== this._generation) return;
         this.setState({
           ...this.state,
           pending: false,
@@ -67,9 +83,11 @@ export const KeyForm = create<KeyFormProps, KeyFormState>({
           value={raw}
           onInput={(event: Event) => {
             const value = (event.target as HTMLTextAreaElement).value;
+            this._invalidate();
             this.setState({
               ...this.state,
               raw: value,
+              pending: false,
               fileName: null,
               error: null,
             });

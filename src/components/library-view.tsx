@@ -11,46 +11,53 @@ type LibraryState = {
   records: LibraryItem[] | null;
   loading: boolean;
   error: string | null;
+  cursor: string | null;
+  hasNextPage: boolean;
 };
 
 export const LibraryView = create<Record<string, never>, LibraryState>({
   initialState: {
     records: null,
+    cursor: null,
+    hasNextPage: false,
     loading: false,
     error: null,
   },
   onMount() {
     this.observe(wallet);
-    this._loadedFor = null;
+    this._loadedFor = undefined;
+    this._generation = 0;
+    this._sync();
   },
-  onUpdate() {
-    const session = wallet.get();
-    if (session.status !== "unlocked") {
-      this._loadedFor = null;
-      return;
-    }
-    if (this._loadedFor === session.address) return;
-    this._loadedFor = session.address;
-    this.setState({ ...this.state, loading: true, error: null, records: null });
-    void listForeverfiles(session.address)
-      .then((records) => {
-        if (wallet.get().status !== "unlocked") return;
-        this.setState({
-          ...this.state,
-          records,
-          loading: false,
-          error: null,
-        });
-      })
-      .catch((err: unknown) => {
-        this.setState({
-          ...this.state,
-          loading: false,
-          records: null,
-          error:
-            err instanceof Error ? err.message : "Could not load records.",
-        });
-      });
+  onUpdate() { this._sync(); },
+  onDestroy() { this._generation++; this._controller?.abort(); },
+  _sync() {
+    const address = wallet.get().address;
+    if (this._loadedFor === address) return;
+    this._loadedFor = address;
+    this._generation++;
+    this._controller?.abort();
+    this.setState({ records: null, loading: false, error: null, cursor: null, hasNextPage: false });
+    if (address) this._load();
+  },
+  _load() {
+    const address = wallet.get().address;
+    if (!address || this.state.loading) return;
+    const generation = ++this._generation;
+    this._controller?.abort();
+    const controller = new AbortController();
+    this._controller = controller;
+    this.setState({ ...this.state, loading: true, error: null });
+    void listForeverfiles(address, this.state.cursor, controller.signal).then((page) => {
+      if (generation !== this._generation || address !== wallet.get().address) return;
+      const records = [...(this.state.records ?? [])];
+      const ids = new Set(records.map((record) => record.id));
+      for (const record of page.records) if (!ids.has(record.id)) { records.push(record); ids.add(record.id); }
+      this.setState({ records, cursor: page.cursor, hasNextPage: page.hasNextPage, loading: false, error: null });
+    }).catch((err: unknown) => {
+      if (generation !== this._generation || address !== wallet.get().address) return;
+      this.setState({ ...this.state, loading: false, error: err instanceof Error ? err.message : "Could not load records." });
+    });
   },
   render() {
     const session = wallet.get();
@@ -82,15 +89,10 @@ export const LibraryView = create<Record<string, never>, LibraryState>({
           </div>
         </div>
 
-        {loading || (records === null && !error) ? (
-          <p className="mt-8 text-muted">Looking up records…</p>
-        ) : error ? (
-          <p role="alert" className="mt-8 text-stamp">
-            {error}
-          </p>
-        ) : records === null || records.length === 0 ? (
-          <p className="mt-8 text-muted">Nothing published with this key yet.</p>
-        ) : (
+        {loading ? <p className="mt-8 text-muted">Looking up records…</p> : null}
+        {error ? <p role="alert" className="mt-8 text-stamp">{error}</p> : null}
+        {!loading && !error && records?.length === 0 ? <p className="mt-8 text-muted">Nothing published with this key yet.</p> : null}
+        {records && records.length > 0 ? (
           <ul className="mt-8 flex flex-col gap-3">
             {records.map((record) => (
               <li key={record.id}>
@@ -103,7 +105,8 @@ export const LibraryView = create<Record<string, never>, LibraryState>({
               </li>
             ))}
           </ul>
-        )}
+        ) : null}
+        {error || this.state.hasNextPage ? <Button type="button" disabled={loading} onClick={() => this._load()}>{error ? "Try again" : "Load more"}</Button> : null}
       </div>
     );
   },

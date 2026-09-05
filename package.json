@@ -34,11 +34,12 @@
   },
   "dependencies": {
     "arweave": "^1.15.7",
-    "svenjs": "3.2.1"
+    "svenjs": "3.3.0"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4",
     "@types/node": "^20",
+    "happy-dom": "^20.14.0",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vite": "^6.2.4",

@@ -10,7 +10,7 @@
 <p align="center">
   <a href="https://foreverfile.xyz">foreverfile.xyz</a>
   ·
-  Built with <a href="https://svenjs.xyz">SvenJS 3.2.1</a>
+  Built with <a href="https://svenjs.xyz">SvenJS 3.3.0</a>
 </p>
 
 ---
@@ -105,3 +105,38 @@ Unknown record URLs render an in-page missing state (HTTP 200) rather than a ser
 ### Deploy
 
 Vercel is configured as a Vite static site (`dist`). Direct visits to `/f/:id` are rewritten to a prerendered record shell; the record itself is loaded from the public network in the browser.
+
+
+## Reliability and browser verification
+
+SvenJS is pinned to 3.3.0, with automatic JSX configured in Vite and Vitest.
+Publishing and byte verification accept files up to **25 MiB**. Metadata lookup
+also supports larger records. Verification compares local SHA-256 against bytes
+from the configured gateway; publisher tags alone cannot verify a file.
+
+One upload session is retained in each tab's memory. Review and authorization
+prepare a signed transaction; its ID appears before **Send signed transaction**.
+A paused transfer resumes the same signed transaction and chunk progress. Internal
+navigation and key locking do not stop an already signed transfer. Ending a
+session frees local buffers but cannot undo a transaction already sent. Reloading
+loses the in-memory session, so unfinished sessions trigger a close/reload warning.
+No JWK or file bytes are persisted to disk by the app.
+
+A successful upload means received, with confirmation still pending. Local receipts
+remain available in the tab while indexing catches up. Metadata, price, and balance
+requests have 20-second deadlines; byte and upload requests have 60-second deadlines.
+
+Run `npm test`, `npm run typecheck`, `npm run build`, and `npm audit`.
+Mounted component tests use happy-dom and emulate browser File cloning because
+Node's structuredClone does not support happy-dom File objects. Real browser checks
+must also cover development state cloning and production hydration.
+
+For a reproducible development upload check, run `npm run dev` and open
+`/scripts/browser-smoke.html`. This test harness generates a disposable key only in
+memory and simulates every Arweave request, so it cannot publish to the network.
+Generate the test wallet, select the synthetic file, review all acknowledgements,
+and prepare/send. Release the first simulated chunk to see an error, resume the
+same transaction, then release subsequent chunks. Navigate away and lock the test
+wallet during transfer; progress remains visible and completion must not redirect
+you away. Return to the session and open its receipt: it remains pending while the
+simulated gateway has no indexed record. The harness is excluded from production.

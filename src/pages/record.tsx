@@ -1,4 +1,5 @@
-import { ButtonLink } from "@/components/button";
+import { localReceipt } from "@/stores/upload";
+import { Button, ButtonLink } from "@/components/button";
 import { PageShell } from "@/components/page-shell";
 import { NetworkLocation, RecordActions } from "@/components/record-actions";
 import { RecordSheet } from "@/components/record-sheet";
@@ -14,7 +15,8 @@ import type { PageProps } from "@/types";
 import { create } from "svenjs";
 
 type RecordState = {
-  status: "loading" | "missing" | "ready";
+  status: "loading" | "missing" | "ready" | "pending" | "error";
+  error?: string;
   record: ForeverFileRecord | null;
   newlyPublished: boolean;
 };
@@ -67,43 +69,29 @@ export const RecordPage = create<PageProps, RecordState>({
       this._load(this.props.params.id);
     }
   },
+  onDestroy() { this._fetchGen++; this._controller?.abort(); },
   _load(id: string) {
+    const gen = ++this._fetchGen;
+    this._controller?.abort();
+    const controller = new AbortController();
+    this._controller = controller;
     this._loadedId = id;
     if (!isRecordId(id)) {
-      this.setState({
-        ...this.state,
-        status: "missing",
-        record: null,
-      });
+      this.setState({ ...this.state, status: "missing", record: null });
       return;
     }
-    const gen = ++this._fetchGen;
-    void getRecord(id)
-      .then((record) => {
-        if (gen !== this._fetchGen) return;
-        if (!record) {
-          this.setState({
-            ...this.state,
-            status: "missing",
-            record: null,
-          });
-          return;
-        }
-        applyRecordTitle(record);
-        this.setState({
-          ...this.state,
-          status: "ready",
-          record,
-        });
-      })
-      .catch(() => {
-        if (gen !== this._fetchGen) return;
-        this.setState({
-          ...this.state,
-          status: "missing",
-          record: null,
-        });
-      });
+    const receipt = localReceipt(id);
+    this.setState({ ...this.state, status: receipt ? "ready" : "loading", record: receipt, error: undefined });
+    void getRecord(id, controller.signal).then((result) => {
+      if (gen !== this._fetchGen) return;
+      const record = result.kind === "found" ? result.record : receipt;
+      if (record) applyRecordTitle(record);
+      this.setState({ ...this.state, status: record ? "ready" : result.kind === "pending" ? "pending" : "missing", record });
+    }).catch((error: unknown) => {
+      if (gen !== this._fetchGen) return;
+      this.setState({ ...this.state, status: receipt ? "ready" : "error", record: receipt,
+        error: error instanceof Error ? error.message : "Could not look up the record." });
+    });
   },
   render() {
     const { status, record, newlyPublished } = this.state;
@@ -116,6 +104,10 @@ export const RecordPage = create<PageProps, RecordState>({
           </div>
         </PageShell>
       );
+    }
+
+    if (status === "error" || status === "pending") {
+      return <PageShell><h1>{status === "pending" ? "Publication pending" : "Could not look up the record"}</h1><p role="alert">{this.state.error ?? "The network is still processing this transaction."}</p><Button onClick={() => this._load(this.props.params.id)}>Try again</Button></PageShell>;
     }
 
     if (status === "missing" || !record) {
@@ -135,16 +127,8 @@ export const RecordPage = create<PageProps, RecordState>({
       );
     }
 
-    const stamp: StampKind = newlyPublished
-      ? "published"
-      : record.timestamp
-        ? "unchanged"
-        : "pending";
-    const recordStatus = newlyPublished
-      ? COPY.record.publishedStatus
-      : record.timestamp
-        ? COPY.record.unchangedStatus
-        : COPY.record.pendingStatus;
+    const stamp: StampKind = record.timestamp !== null ? (newlyPublished ? "published" : "unchanged") : "pending";
+    const recordStatus = record.timestamp !== null ? (newlyPublished ? COPY.record.publishedStatus : COPY.record.unchangedStatus) : COPY.record.pendingStatus;
 
     return (
       <PageShell>
@@ -156,6 +140,8 @@ export const RecordPage = create<PageProps, RecordState>({
         >
           <RecordActions id={record.id} />
         </RecordSheet>
+        {this.state.error ? <p role="alert">{this.state.error}</p> : null}
+        {record.timestamp === null || this.state.error ? <Button onClick={() => this._load(record.id)}>Check network status</Button> : null}
         <NetworkLocation id={record.id} />
       </PageShell>
     );

@@ -25,23 +25,18 @@ export function matchRoute(pathname: string, routes: Route[]): Match | null {
     const m = path.match(re);
     if (!m) continue;
     const params: Record<string, string> = {};
-    keys.forEach((key, i) => {
-      params[key] = decodeURIComponent(m[i + 1]);
-    });
+    try {
+      keys.forEach((key, i) => { params[key] = decodeURIComponent(m[i + 1]); });
+    } catch { return null; }
     return { route, params };
   }
   return null;
 }
 
 export function navigate(to: string, replace = false) {
-  const apply = () => {
-    if (replace) history.replaceState({}, "", to);
-    else history.pushState({}, "", to);
-    window.dispatchEvent(new PopStateEvent("popstate"));
-  };
-  const start = document.startViewTransition?.bind(document);
-  if (start) start(apply);
-  else apply();
+  if (replace) history.replaceState({}, "", to);
+  else history.pushState({}, "", to);
+  window.dispatchEvent(new PopStateEvent("popstate"));
 }
 
 export function isInternalLink(a: HTMLAnchorElement, event: MouseEvent) {
