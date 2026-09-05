@@ -178,7 +178,6 @@ export const VerifyPanel = create<VerifyPanelProps, VerifyPanelState>({
       const id = parseRecordId(link);
       if (!link.trim() && !selected) { finish({ kind: "file-missing" }); return; }
       if (!id) { finish({ kind: "invalid" }); return; }
-      if (selected && selected.size > FILE_SIZE_WARN_BYTES) { finish({ kind: "too-large" }); return; }
       finish({ kind: "verifying" });
       try {
         const result = await getRecord(id, controller.signal);
@@ -187,7 +186,10 @@ export const VerifyPanel = create<VerifyPanelProps, VerifyPanelState>({
         if (result.kind === "pending") { finish({ kind: "error", message: "This transaction is pending. Please try again." }); return; }
         const record = result.record;
         if (!selected) { finish({ kind: record.timestamp !== null ? "found" : "pending", record }); return; }
-        if (record.size > FILE_SIZE_WARN_BYTES) { finish({ kind: "too-large", record }); return; }
+        if (selected.size > FILE_SIZE_WARN_BYTES || record.size > FILE_SIZE_WARN_BYTES) {
+          finish({ kind: "too-large", record });
+          return;
+        }
         const localHash = await sha256Blob(selected);
         controller.signal.throwIfAborted();
         const bytes = await fetchPublishedBytes(id, controller.signal, record.size);

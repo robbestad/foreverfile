@@ -67,3 +67,33 @@ it("warns on tab close and ending a session invalidates pending transfer", async
   expect(upload.get().status).toBe("idle"); expect(hasUnfinishedUpload()).toBe(false);
   const next = new Event("beforeunload", { cancelable: true }); window.dispatchEvent(next); expect(next.defaultPrevented).toBe(false);
 });
+
+it.each(["lock", "switch", "reopen"])("discards a transaction when the wallet changes during signing: %s", async (change) => {
+  const signing = deferred<void>();
+  const started = deferred<void>();
+  sign.mockImplementationOnce(async (tx) => {
+    started.resolve();
+    await signing.promise;
+    tx.id = id;
+    tx.signature = "signed";
+  });
+  const post = vi.spyOn(client.api, "post");
+  const pending = prepareUpload(new File(["x"], "x"), approvals);
+  const rejected = expect(pending).rejects.toThrow("during signing");
+  await started.promise;
+  lockWallet();
+  if (change !== "lock") {
+    wallet.set({ status: "unlocked", address: change === "switch" ? "b".repeat(43) : id, jwk: key });
+  }
+  signing.resolve();
+  await rejected;
+  expect(sign).toHaveBeenCalledTimes(1);
+  expect(upload.get().status).toBe("error");
+  expect(upload.get().record).toBeNull();
+  expect(hasUnfinishedUpload()).toBe(false);
+  await resumeUpload();
+  expect(post).not.toHaveBeenCalled();
+  const closing = new Event("beforeunload", { cancelable: true });
+  window.dispatchEvent(closing);
+  expect(closing.defaultPrevented).toBe(false);
+});

@@ -46,7 +46,19 @@ it("rejects forged hash tags and differing bytes", async () => {
 it("refuses oversized local files before reading and still permits metadata-only lookup", async () => {
   render(<VerifyPanel initialRecord={id} />, root);
   const file = new File([new Uint8Array(25 * 1024 * 1024 + 1)], "large");
-  choose(file); submit(); await settle(); expect(hashing.sha256Blob).not.toHaveBeenCalled(); expect(network.getRecord).not.toHaveBeenCalled();
+  choose(file); submit(); await settle();
+  expect(network.getRecord).toHaveBeenCalledTimes(1);
+  expect(root.textContent).toContain("original.txt");
+  expect(root.textContent).toContain("25 MiB");
+  expect(hashing.sha256Blob).not.toHaveBeenCalled();
+  expect(network.fetchPublishedBytes).not.toHaveBeenCalled();
+  // The retained oversized file must not prevent subsequent metadata lookups.
+  vi.mocked(network.getRecord).mockResolvedValueOnce({ kind: "found", record: { ...record, id: "b".repeat(43), name: "second.txt" } });
+  input("#verify-link", "b".repeat(43)); submit(); await settle();
+  expect(root.textContent).toContain("second.txt");
+  expect(root.textContent).not.toContain("original.txt");
+  expect(hashing.sha256Blob).not.toHaveBeenCalled();
+  expect(network.fetchPublishedBytes).not.toHaveBeenCalled();
   unmountRoot(root); render(<VerifyPanel initialRecord={id} />, root);
   vi.mocked(network.getRecord).mockResolvedValue({ kind: "found", record: { ...record, size: 100_000_000 } });
   submit(); await settle(); expect(root.textContent).toContain("original.txt"); expect(network.fetchPublishedBytes).not.toHaveBeenCalled();

@@ -64,6 +64,9 @@ export async function prepareUpload(file: File, approvals: Approvals): Promise<v
     if (revision !== walletRevision() || wallet.get().status !== "unlocked") throw new Error("The key changed or was locked before signing. Authorize again.");
     await own.client.transactions.sign(tx, current.jwk);
     if (session !== own) return;
+    if (revision !== walletRevision() || wallet.get().status !== "unlocked") {
+      throw new Error("The key changed or was locked during signing. Authorize again.");
+    }
     own.tx = tx;
     own.running = false;
     upload.set({ ...upload.get(), status: "ready", record: {
@@ -72,7 +75,7 @@ export async function prepareUpload(file: File, approvals: Approvals): Promise<v
     } });
   } catch (error) {
     if (session !== own) return;
-    release(); // Nothing was sent; no signed transfer exists yet.
+    release(); // Nothing was sent; discard any transaction signed with a stale key.
     upload.set({ ...upload.get(), status: "error", error: error instanceof Error ? error.message : "Could not prepare publication." });
     throw error;
   }
