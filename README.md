@@ -140,3 +140,47 @@ same transaction, then release subsequent chunks. Navigate away and lock the tes
 wallet during transfer; progress remains visible and completion must not redirect
 you away. Return to the session and open its receipt: it remains pending while the
 simulated gateway has no indexed record. The harness is excluded from production.
+
+
+## Shared public registry
+
+The static frontend now uses `/api/records`, a Vercel Node function backed by
+Neon Postgres. Only transaction IDs and public network metadata are stored.
+The browser sends `POST /api/records` with exactly `{ "id": "<Arweave ID>" }`
+after upload. The server fetches and validates metadata from Arweave, requires
+the ForeverFile app tag, and upserts by ID. It does not trust client filenames,
+hashes, sizes, or publication dates. JWKs and file bytes never enter this API.
+
+Pending network transactions are saved as IDs and refreshed on catalog reads.
+Reads also discover recent network publications, skipping malformed records.
+Previously saved records remain available during gateway failures. This is a
+public index, not proof of ownership or independent blockchain verification.
+
+If registration fails, only public IDs are kept in a browser retry queue. The
+app retries on reopening, regaining connectivity, or **Retry registration**;
+this never signs or uploads a second transaction. The registry can supply saved
+receipt metadata in another browser while the gateway is unavailable.
+
+### Setup
+
+1. Create a Neon **Free** database in Vercel Marketplace, region Frankfurt (`fra1`),
+   with Neon Auth disabled. Connect it to this project. Use a separate database
+   branch for preview deployments if preview data should be isolated.
+2. Set the server-only `DATABASE_URL` in the required Vercel environments. Never
+   give it a `VITE_` prefix or commit it. No database credentials are currently
+   included in this repository.
+3. With `DATABASE_URL` set in your environment, run `npm run db:migrate`.
+   If the connection is in `.env.local`, use `node --env-file=.env.local scripts/migrate-registry.mjs` instead.
+   The additive, repeatable migration creates the metadata table and indexes.
+4. Redeploy the project. `GET /api/records` should return `{ "records": [] }`
+   until a transaction is registered or discovered. `POST` returns `202` only
+   after a pending ID has been durably saved, and `200` for saved metadata.
+
+`npm run dev` and `npm run preview` serve the static UI. To include the real API
+locally, use `npx vercel dev` with `DATABASE_URL` configured. Without a database,
+the API returns 503 and registration remains retryable. An in-memory database is
+never substituted for production persistence.
+
+Tests execute the real schema and queries in PGlite (Postgres), exercising
+idempotent writes, independent service instances, pending-to-confirmed updates,
+invalid payloads, retry persistence, and gateway failures.

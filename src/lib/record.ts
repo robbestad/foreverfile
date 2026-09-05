@@ -1,5 +1,5 @@
-import { SITE_HOST, SITE_URL } from "./site";
-import { APP_NAME, tagValue, type ArweaveTag } from "./tags";
+import { SITE_HOST, SITE_URL } from "./site.js";
+import { APP_NAME, tagValue, type ArweaveTag } from "./tags.js";
 
 export const RECORD_ID_PATTERN = /^[a-zA-Z0-9_-]{43}$/;
 

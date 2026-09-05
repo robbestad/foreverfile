@@ -6,6 +6,7 @@ import { prepareUpload, resumeUpload, endUpload, upload, localReceipt, hasUnfini
 import { wallet, lockWallet } from "./wallet";
 import { deferred, id, key } from "@/test/helpers";
 vi.mock("@/lib/arweave", async (original) => ({ ...await original<typeof network>(), createArweave: vi.fn(), getBalance: vi.fn().mockResolvedValue({ ar: "1", winston: "9999" }) }));
+vi.mock("@/stores/registration", () => ({ queueRegistration: vi.fn() }));
 const approvals = { isPublic: true, irreversible: true, notPrivate: true };
 let client: ReturnType<typeof createArweave>;
 let sign: ReturnType<typeof vi.fn<ReturnType<typeof createArweave>["transactions"]["sign"]>>;

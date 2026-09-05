@@ -4,8 +4,22 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "routes": [
-    { "handle": "filesystem" },
-    { "src": "/f/[^/]+/?", "dest": "/f/index.html" },
-    { "src": "/(.*)", "status": 404, "dest": "/404.html" }
-  ]
+    {
+      "handle": "filesystem"
+    },
+    {
+      "src": "/f/[^/]+/?",
+      "dest": "/f/index.html"
+    },
+    {
+      "src": "/(.*)",
+      "status": 404,
+      "dest": "/404.html"
+    }
+  ],
+  "functions": {
+    "api/records.ts": {
+      "maxDuration": 60
+    }
+  }
 }
