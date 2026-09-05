@@ -1,9 +1,9 @@
 import Arweave from "arweave";
-import type { ArweaveJwk } from "@/lib/jwk";
-import { isRecordId, recordFromNetwork, type ForeverFileRecord } from "@/lib/record";
-import { APP_NAME, FILE_SIZE_WARN_BYTES, type ArweaveTag } from "@/lib/tags";
-import { winstonToAr } from "@/lib/format";
-import { METADATA_TIMEOUT, TRANSFER_TIMEOUT, withDeadline } from "@/lib/network";
+import type { ArweaveJwk } from "./jwk.js";
+import { isRecordId, recordFromNetwork, type ForeverFileRecord } from "./record.js";
+import { APP_NAME, FILE_SIZE_WARN_BYTES, type ArweaveTag } from "./tags.js";
+import { winstonToAr } from "./format.js";
+import { METADATA_TIMEOUT, TRANSFER_TIMEOUT, withDeadline } from "./network.js";
 
 export const GATEWAY_HOST = "arweave.net";
 export const GATEWAY_URL = `https://${GATEWAY_HOST}`;

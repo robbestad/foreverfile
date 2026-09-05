@@ -1,3 +1,4 @@
+import { queueRegistration } from "@/stores/registration";
 import { createStore } from "svenjs";
 import { checkFileSize, createArweave, getBalance } from "@/lib/arweave";
 import { sha256Hex } from "@/lib/hash";
@@ -104,6 +105,7 @@ export async function resumeUpload(): Promise<void> {
     receipts.set(record.id, record);
     release();
     upload.set({ ...upload.get(), status: "complete", progress: 100, error: null });
+    queueRegistration(record.id);
   } catch (error) {
     if (session !== own) return;
     upload.set({ ...upload.get(), status: "error", error: error instanceof Error ? error.message : "Transfer paused. Resume to try again." });

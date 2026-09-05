@@ -3,6 +3,7 @@ import { Button, ButtonLink } from "@/components/button";
 import { PageShell } from "@/components/page-shell";
 import { NetworkLocation, RecordActions } from "@/components/record-actions";
 import { RecordSheet } from "@/components/record-sheet";
+import { registeredRecord } from "@/lib/registry";
 import { getRecord } from "@/lib/arweave";
 import { COPY } from "@/lib/copy";
 import {
@@ -82,14 +83,22 @@ export const RecordPage = create<PageProps, RecordState>({
     }
     const receipt = localReceipt(id);
     this.setState({ ...this.state, status: receipt ? "ready" : "loading", record: receipt, error: undefined });
-    void getRecord(id, controller.signal).then((result) => {
+    const saved = receipt ? Promise.resolve(receipt) : registeredRecord(id, controller.signal).catch(() => null);
+    void saved.then((record) => {
+      if (gen !== this._fetchGen || !record || this.state.status !== "loading") return;
+      applyRecordTitle(record);
+      this.setState({ ...this.state, status: "ready", record });
+    });
+    void getRecord(id, controller.signal).then(async (result) => {
       if (gen !== this._fetchGen) return;
-      const record = result.kind === "found" ? result.record : receipt;
+      const record = result.kind === "found" ? result.record : await saved;
+      if (gen !== this._fetchGen) return;
       if (record) applyRecordTitle(record);
       this.setState({ ...this.state, status: record ? "ready" : result.kind === "pending" ? "pending" : "missing", record });
-    }).catch((error: unknown) => {
+    }).catch(async (error: unknown) => {
+      const record = await saved;
       if (gen !== this._fetchGen) return;
-      this.setState({ ...this.state, status: receipt ? "ready" : "error", record: receipt,
+      this.setState({ ...this.state, status: record ? "ready" : "error", record,
         error: error instanceof Error ? error.message : "Could not look up the record." });
     });
   },

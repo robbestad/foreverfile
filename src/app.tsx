@@ -2,6 +2,7 @@ import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { isInternalLink, matchRoute, navigate } from "@/router";
 import { loadRoute, NotFoundPage, routes, syncDocumentMetadata } from "@/site";
+import { registration, syncRegistrations } from "@/stores/registration";
 import { upload } from "@/stores/upload";
 import { create, flushSync } from "svenjs";
 
@@ -30,6 +31,10 @@ export const App = create<ShellProps, ShellState>({
   },
   onMount() {
     this.observe(upload);
+    this.observe(registration);
+    this._onOnline = () => { void syncRegistrations(); };
+    window.addEventListener("online", this._onOnline);
+    void syncRegistrations();
     this._navigation = 0;
     syncDocumentMetadata(location.pathname);
     if (location.search !== this.state.search) {
@@ -67,6 +72,7 @@ export const App = create<ShellProps, ShellState>({
   },
   onDestroy() {
     this._navigation++;
+    window.removeEventListener("online", this._onOnline);
     window.removeEventListener("popstate", this._onPop);
     this._root?.removeEventListener("click", this._onClick);
   },
@@ -86,6 +92,10 @@ export const App = create<ShellProps, ShellState>({
       >
         <SiteHeader />
         {upload.get().status !== "idle" ? <aside className="border-b border-rule px-6 py-3" aria-live="polite"><a href="/publish">Publication: {upload.get().status} · {Math.round(upload.get().progress)}% — open upload session</a></aside> : null}
+        {registration.get().pending > 0 ? <aside className="border-b border-rule px-6 py-3" aria-live="polite">
+          <p>{registration.get().error ?? "Saving public listing…"}</p>
+          {!registration.get().working ? <button className="underline" onClick={() => void syncRegistrations()}>Retry registration</button> : null}
+        </aside> : null}
         <main className="flex-1" id="main">
           {this.state.routeError ? <div role="alert" className="p-8"><h1>Could not load this page</h1><button onClick={() => location.reload()}>Reload page</button></div> : <Page params={params} search={this.state.search} />}
         </main>

@@ -10,9 +10,11 @@ import { wallet, lockWallet } from "@/stores/wallet";
 import { endUpload } from "@/stores/upload";
 import * as network from "@/lib/arweave";
 import * as hashing from "@/lib/hash";
+import { registeredRecord } from "@/lib/registry";
 import { deferred, id, key, record } from "@/test/helpers";
 vi.mock("@/lib/arweave", async (original) => ({ ...await original<typeof network>(), getRecord: vi.fn(), fetchPublishedBytes: vi.fn(), listForeverfiles: vi.fn(), getBalance: vi.fn(), quotePrice: vi.fn(), addressFromJwk: vi.fn() }));
 vi.mock("@/lib/hash", async (original) => ({ ...await original<typeof hashing>(), sha256Blob: vi.fn(), sha256Hex: vi.fn() }));
+vi.mock("@/lib/registry", () => ({ registeredRecord: vi.fn() }));
 let root: HTMLElement;
 const settle = async () => { for (let i = 0; i < 12; i++) { await Promise.resolve(); flushSync(); } };
 function input(selector: string, value: string) { const el = root.querySelector<HTMLInputElement>(selector)!; el.value = value; el.dispatchEvent(new Event("input", { bubbles: true })); flushSync(); }
@@ -20,7 +22,9 @@ function choose(file: File) { const el = root.querySelector<HTMLInputElement>('i
 function submit() { root.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })); flushSync(); }
 function click(text: string) { const button = Array.from(root.querySelectorAll("button")).find(b => b.textContent?.includes(text)); expect(button, text).toBeTruthy(); button!.click(); flushSync(); }
 beforeEach(() => {
-  vi.resetAllMocks(); lockWallet(); endUpload(); history.replaceState({}, "", "/publish");
+  vi.resetAllMocks();
+  vi.mocked(registeredRecord).mockRejectedValue(new Error("Not registered"));
+  lockWallet(); endUpload(); history.replaceState({}, "", "/publish");
   root = document.createElement("div"); document.body.append(root);
   vi.mocked(network.getRecord).mockResolvedValue({ kind: "found", record });
   vi.mocked(network.fetchPublishedBytes).mockResolvedValue(new Uint8Array([1]).buffer);
@@ -135,4 +139,14 @@ it("keeps publishing errors visible in the authorization step", async () => {
   click("Publish publicly"); await settle();
   expect(root.textContent).toContain("simulated preparation failure"); expect(root.textContent).toContain("Authorize");
   createTx.mockRestore(); init.mockRestore();
+});
+
+it("shows a shared saved receipt when Arweave is unavailable", async () => {
+  vi.mocked(registeredRecord).mockResolvedValue({ ...record, timestamp: null });
+  vi.mocked(network.getRecord).mockRejectedValue(new Error("Gateway offline"));
+  render(<RecordPage params={{ id }} search="" />, root); await settle();
+  expect(root.textContent).toContain(record.name);
+  expect(root.textContent).toContain("Gateway offline");
+  expect(root.textContent).toContain("Pending network time");
+  expect(root.textContent).not.toContain("Published and confirmed");
 });

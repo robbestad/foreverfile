@@ -1,6 +1,7 @@
 import { Button } from "@/components/button";
 import { RecordRow } from "@/components/record-row";
-import { GATEWAY_URL, recentForeverfiles } from "@/lib/arweave";
+import { registeredRecords } from "@/lib/registry";
+import { GATEWAY_URL } from "@/lib/arweave";
 import { recordPath, type ForeverFileRecord } from "@/lib/record";
 import { create } from "svenjs";
 
@@ -24,7 +25,7 @@ export const RecentRecords = create<Record<string, never>, RecentRecordsState>({
     this._controller = controller;
     this.setState({ ...this.state, loading: true, error: null });
     try {
-      const records = await recentForeverfiles(controller.signal);
+      const records = await registeredRecords(controller.signal);
       if (controller.signal.aborted) return;
       this.setState({ records, loading: false, error: null });
     } catch (error) {
@@ -54,7 +55,7 @@ export const RecentRecords = create<Record<string, never>, RecentRecordsState>({
           ) : null}
           {!loading && !error && records.length === 0 ? (
             <p className="text-sm text-muted">
-              No public ForeverFile records are indexed yet. Published files appear here once the network indexes them.
+              No public ForeverFile records have been registered yet. Newly published files appear here after their listing is saved.
             </p>
           ) : null}
           {records.length > 0 ? (

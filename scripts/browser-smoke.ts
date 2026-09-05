@@ -12,6 +12,9 @@ let release: (() => void) | undefined;
 let failChunk = true;
 window.fetch = async (input, init) => {
   const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url, location.href);
+  if (url.origin === location.origin && url.pathname === "/api/records") {
+    return init?.method === "POST" ? Response.json({ kind: "pending" }, { status: 202 }) : Response.json({ records: [] });
+  }
   if (url.origin === location.origin) return nativeFetch(input, init);
   if (url.hostname !== "arweave.net") throw new Error("Smoke test blocks external traffic.");
   if (url.pathname.includes("/balance")) return new Response("9999999999999999");

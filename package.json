@@ -30,13 +30,16 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "db:migrate": "node --env-file-if-exists=.env.local scripts/migrate-registry.mjs"
   },
   "dependencies": {
+    "@neondatabase/serverless": "^1.1.0",
     "arweave": "^1.15.7",
     "svenjs": "3.3.0"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "@tailwindcss/vite": "^4",
     "@types/node": "^20",
     "happy-dom": "^20.14.0",

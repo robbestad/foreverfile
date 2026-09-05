@@ -1,7 +1,11 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["dom", "dom.iterable", "esnext"],
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
     "skipLibCheck": true,
     "strict": true,
     "noEmit": true,
@@ -12,11 +16,25 @@
     "isolatedModules": true,
     "jsx": "react-jsx",
     "jsxImportSource": "svenjs",
-    "types": ["vite/client"],
+    "types": [
+      "vite/client"
+    ],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": [
+        "./src/*"
+      ]
     }
   },
-  "include": ["src", "vite.config.ts", "vitest.config.ts"],
-  "exclude": ["node_modules", "dist", ".vite"]
+  "include": [
+    "src",
+    "vite.config.ts",
+    "vitest.config.ts",
+    "api",
+    "server"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    ".vite"
+  ]
 }
