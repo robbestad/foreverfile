@@ -15,6 +15,8 @@ import { SITE_NAME } from "@/lib/site";
 import type { PageProps } from "@/types";
 import { create } from "svenjs";
 
+const STATUS_POLL_INTERVAL = 15_000;
+
 type RecordState = {
   status: "loading" | "missing" | "ready" | "pending" | "error";
   error?: string;
@@ -44,6 +46,15 @@ export const RecordPage = create<PageProps, RecordState>({
   },
   onMount() {
     this._fetchGen = 0;
+    this._destroyed = false;
+    this._resume = () => {
+      this._clearPoll();
+      if (document.visibilityState !== "hidden" && this._needsPoll()) {
+        this._load(this.props.params.id);
+      }
+    };
+    document.addEventListener("visibilitychange", this._resume);
+    window.addEventListener("pageshow", this._resume);
     this._load(this.props.params.id);
     if (this.state.newlyPublished && typeof history !== "undefined") {
       const params = new URLSearchParams(
@@ -70,19 +81,45 @@ export const RecordPage = create<PageProps, RecordState>({
       this._load(this.props.params.id);
     }
   },
-  onDestroy() { this._fetchGen++; this._controller?.abort(); },
+  onDestroy() {
+    this._destroyed = true;
+    this._fetchGen++;
+    this._clearPoll();
+    this._controller?.abort();
+    document.removeEventListener("visibilitychange", this._resume);
+    window.removeEventListener("pageshow", this._resume);
+  },
+  _clearPoll() {
+    clearTimeout(this._pollTimer);
+  },
+  _needsPoll() {
+    return this.state.record?.timestamp === null ||
+      this.state.status === "pending" || this.state.status === "error";
+  },
+  _schedulePoll() {
+    this._clearPoll();
+    if (!this._destroyed && document.visibilityState !== "hidden" && this._needsPoll()) {
+      // Schedule after completion so slow lookups never overlap.
+      this._pollTimer = setTimeout(() => this._load(this.props.params.id), STATUS_POLL_INTERVAL);
+    }
+  },
   _load(id: string) {
+    if (this._destroyed || (this._loadedId === id && this._inFlight)) return;
+    this._clearPoll();
     const gen = ++this._fetchGen;
     this._controller?.abort();
     const controller = new AbortController();
     this._controller = controller;
     this._loadedId = id;
+    this._inFlight = false;
     if (!isRecordId(id)) {
       this.setState({ ...this.state, status: "missing", record: null });
       return;
     }
-    const receipt = localReceipt(id);
-    this.setState({ ...this.state, status: receipt ? "ready" : "loading", record: receipt, error: undefined });
+    this._inFlight = true;
+    const wasPending = this.state.status === "pending";
+    const receipt = this.state.record?.id === id ? this.state.record : localReceipt(id);
+    this.setState({ ...this.state, status: receipt ? "ready" : wasPending ? "pending" : "loading", record: receipt, error: undefined });
     const saved = receipt ? Promise.resolve(receipt) : registeredRecord(id, controller.signal).catch(() => null);
     void saved.then((record) => {
       if (gen !== this._fetchGen || !record || this.state.status !== "loading") return;
@@ -94,12 +131,16 @@ export const RecordPage = create<PageProps, RecordState>({
       const record = result.kind === "found" ? result.record : await saved;
       if (gen !== this._fetchGen) return;
       if (record) applyRecordTitle(record);
-      this.setState({ ...this.state, status: record ? "ready" : result.kind === "pending" ? "pending" : "missing", record });
+      this.setState({ ...this.state, status: record ? "ready" : result.kind === "pending" || wasPending ? "pending" : "missing", record });
     }).catch(async (error: unknown) => {
       const record = await saved;
       if (gen !== this._fetchGen) return;
-      this.setState({ ...this.state, status: record ? "ready" : "error", record,
+      this.setState({ ...this.state, status: record ? "ready" : wasPending ? "pending" : "error", record,
         error: error instanceof Error ? error.message : "Could not look up the record." });
+    }).finally(() => {
+      if (gen !== this._fetchGen) return;
+      this._inFlight = false;
+      this._schedulePoll();
     });
   },
   render() {
